@@ -1,0 +1,12 @@
+{"id": "najdi_id", "dialect": "najdi", "text": "هلا، رقم هويتي 1045238712 وأبي أعرف وش صار على طلبي", "expected": ["NATIONAL_ID"]}
+{"id": "hijazi_iqama_indic", "dialect": "hijazi", "text": "أبغى أحدّث بياناتي، رقم الإقامة ٢٠٩٩٨١٢٣٤٥", "expected": ["IQAMA"]}
+{"id": "gulf_mobile_intl", "dialect": "gulf", "text": "شلونك، كلمني على +966 55 987 6543 لو سمحت", "expected": ["MOBILE"]}
+{"id": "msa_iban", "dialect": "msa", "text": "يرجى تحويل المبلغ إلى الحساب SA03 8000 0000 6080 1016 7519", "expected": ["IBAN"]}
+{"id": "english_email_mobile", "dialect": "english", "text": "Send the invoice to sara.k@example.com or WhatsApp 0559876543", "expected": ["EMAIL", "MOBILE"]}
+{"id": "arabizi_id", "dialect": "arabizi", "text": "ra8m 7wyti 1088992316 w abi a3rf el fatora", "expected": ["NATIONAL_ID"]}
+{"id": "mixed_all", "dialect": "mixed", "text": "Agent: تمام، الهوية ١٠٨٨٩٩٢٣١٦ والجوال 0501112233 والآيبان SA0380000000608010167519", "expected": ["IBAN", "MOBILE", "NATIONAL_ID"]}
+{"id": "neg_order_number", "dialect": "najdi", "text": "رقم الطلب 1234567890 وصلني ناقص", "expected": []}
+{"id": "neg_invoice_9_digits", "dialect": "english", "text": "Invoice 482913374 was charged twice", "expected": []}
+{"id": "neg_landline", "dialect": "hijazi", "text": "اتصلت على الفرع 0126543210 وما أحد رد", "expected": []}
+{"id": "neg_bad_iban", "dialect": "msa", "text": "الآيبان SA0480000000608010167519", "expected": []}
+{"id": "neg_amount", "dialect": "gulf", "text": "الفاتورة ٥٤٩ ريال وهذا كثير", "expected": []}

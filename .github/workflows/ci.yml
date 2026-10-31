@@ -1,0 +1,20 @@
+# Runs once this folder is its own repository (GitHub only reads .github/ at the repo root).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run black --check cc_copilot tests evals
+      - run: uv run isort --check cc_copilot tests evals
+      - run: uv run flake8 cc_copilot tests evals
+      - run: uv run pytest -q
+      - run: uv run python evals/pii_detector_eval.py

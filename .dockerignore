@@ -1,0 +1,5 @@
+.venv
+.env
+tests
+evals
+__pycache__
