@@ -6,10 +6,16 @@ from cc_copilot.types.results import (
     DocumentReviewResult,
     InteractionReport,
     PolicyCheckResult,
+    PIIFinding,
 )
 
 LOW_QA_SCORE = 3.0
 
+def _exposed_by_agent(findings: list[PIIFinding]) -> list[PIIFinding]:
+    """Return only the findings that were read out loud by the agent."""
+    # Customer sharing thier own ID is normal but agent exposing it breaks IDV-2. 
+    # Unlabelled lines count as the agent's, so missing labels fail safe instead of hiding a leak.
+    return [f for f in findings if f.speaker != "customer"]
 
 def build_report(
     chat: ChatReviewResult | None = None,
@@ -21,9 +27,9 @@ def build_report(
     warnings: list[str] = []
 
     if chat:
-        if chat.pii_findings:
-            types = sorted({f.type.value for f in chat.pii_findings})
-            blocking.append(f"Chat exposes personal data: {', '.join(types)} (policy IDV-2)")
+        if agent_findings:= _exposed_by_agent(chat.pii_findings):
+            types = sorted({f.type.value for f in agent_findings})
+            blocking.append(f"Agent exposed personal data: {', '.join(types)} (policy IDV-2)")
         if chat.contains_other_pii:
             warnings.append("Chat may contain names or addresses")
         if chat.missed_escalation:
@@ -37,7 +43,7 @@ def build_report(
 
     if call:
         if call.pii_findings:
-            blocking.append("Call transcript contains personal data read out loud (policy IDV-2)")
+            blocking.append("Agent read personal data read out loud on the call (policy IDV-2)")
         if call.is_unprofessional:
             warnings.append("Unprofessional behaviour on the call")
         if call.qa_score < LOW_QA_SCORE:

@@ -1,9 +1,7 @@
 import os
 from functools import lru_cache
 from pathlib import Path
-
 from dotenv import load_dotenv
-
 from cc_copilot.types.model_choice import ModelChoice
 
 load_dotenv()

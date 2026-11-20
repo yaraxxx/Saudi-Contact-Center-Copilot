@@ -2,19 +2,21 @@ import os
 from contextlib import asynccontextmanager
 from functools import lru_cache
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+import asyncio
 
 from cc_copilot.agents.call_qa_agent import review_call
 from cc_copilot.agents.chat_review_agent import review_chat
 from cc_copilot.agents.document_agent import review_document
-from cc_copilot.agents.policy_agent import check_policy
+from cc_copilot.agents.policy_agent import check_policy, last_exchange
+from cc_copilot.fusion import build_report
 from cc_copilot.env import POLICY_DIR, get_default_model_choice, get_user_api_key
 from cc_copilot.pii.saudi_patterns import mask_pii
 from cc_copilot.rag.retriever import BM25Retriever, load_policy_chunks
 from cc_copilot.types.model_choice import ModelChoice
-from cc_copilot.types.results import CallQAResult, ChatReviewResult, DocumentReviewResult, PIIFinding, PolicyCheckResult
+from cc_copilot.types.results import CallQAResult, ChatReviewResult, DocumentReviewResult, PIIFinding, PolicyCheckResult, InteractionReview
 from cc_copilot.utils import detect_file_type
 
 # Standard auth scheme using -H "Authorization: Bearer <api_key>" header.
@@ -113,6 +115,41 @@ async def policy_check_endpoint(
     retriever: BM25Retriever = Depends(get_retriever),
 ):
     return await check_policy(model_choice, retriever, request.customer_message, request.agent_reply)
+
+@app.post("/api/v1/review/interaction", response_model=InteractionReview)
+async def review_interaction_endpoint(
+    transcript: str | None = Form(None),
+    call: UploadFile | None = File(None),
+    documents: list[UploadFile] | None = File(None),
+    model_choice: ModelChoice = Depends(get_model_choice),
+    retriever: BM25Retriever = Depends(get_retriever),
+):
+    """Review a chat transcript, a call and any images from the same interaction, then fuse the results."""
+    documents = documents or []
+    if not (transcript or call or documents):
+        raise HTTPException(status_code=422, detail="Send at least one of: transcript, call, documents")
+    # Read and check every upload first, so a bad file fails before any Gemini call is paid for.
+    call_upload = await _read_upload(call, "audio/") if call else None
+    doc_uploads = [await _read_upload(d, "image/") for d in documents]
+
+    # Every reviewer is independent, so run them all at the same time.
+    tasks = {}
+    if transcript:
+        tasks["chat"] = review_chat(model_choice, transcript)
+        if exchange := last_exchange(transcript):
+            tasks["policy"] = check_policy(model_choice, retriever, *exchange)
+    if call_upload:
+        tasks["call"] = review_call(model_choice, *call_upload)
+    for i, upload in enumerate(doc_uploads):
+        tasks[f"document_{i}"] = review_document(model_choice, *upload)
+
+    results = dict(zip(tasks, await asyncio.gather(*tasks.values())))
+    docs = [results[f"document_{i}"] for i in range(len(doc_uploads))]
+
+    report = build_report(chat=results.get("chat"), call=results.get("call"), documents=docs, policy=results.get("policy"))
+    return InteractionReview(
+        report=report, chat=results.get("chat"), policy=results.get("policy"), call=results.get("call"), documents=docs
+    )
 
 
 @app.get("/api/v1/health")

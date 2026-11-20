@@ -44,7 +44,7 @@ async def review_call(model_choice: ModelChoice, audio: bytes, media_type: str) 
     for i, turn in enumerate(output.transcript):
         masked_text, matches = mask_pii(turn.text)
         masked_turns.append(TranscriptTurn(speaker=turn.speaker, text=masked_text))
-        findings.extend(PIIFinding.from_match(m, turn=i) for m in matches)
+        findings.extend(PIIFinding.from_match(m, turn=i,speaker=turn.speaker) for m in matches)
 
     return CallQAResult(
         **output.model_dump(exclude={"transcript"}),

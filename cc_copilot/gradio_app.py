@@ -4,16 +4,16 @@ except the training simulator, which runs the customer agent in-process.
 """
 
 import asyncio
-
 import gradio as gr
 import requests
-
+from contextlib import ExitStack
 from cc_copilot.agents.customer_sim_agent import DIALECT_HINTS, CustomerPersona, customer_reply
 from cc_copilot.env import API_BASE_URL, get_default_model_choice, get_user_api_key
 from cc_copilot.fusion import build_report
 from cc_copilot.types.results import ChatReviewResult
 
 
+# POST  - The messenger service is a separate process, so we can't call it directly. We have to go over HTTP.
 def _post(path: str, **kwargs) -> dict:
     response = requests.post(
         f"{API_BASE_URL}{path}", headers={"Authorization": f"Bearer {get_user_api_key()}"}, timeout=120, **kwargs
@@ -21,6 +21,10 @@ def _post(path: str, **kwargs) -> dict:
     response.raise_for_status()
     return response.json()
 
+
+
+
+# ----------------- Handler functions for Gradio UI -----------------
 
 def mask_text(text: str) -> tuple[str, list]:
     result = _post("/api/v1/pii/mask", json={"text": text})
@@ -39,6 +43,16 @@ def review_call_file(path: str) -> dict:
 
 def check_reply(customer_message: str, agent_reply: str) -> dict:
     return _post("/api/v1/policy/check", json={"customer_message": customer_message, "agent_reply": agent_reply})
+
+
+def review_interaction(transcript: str, call_path: str | None, image_paths: list[str] | None) -> tuple[dict, dict]:
+    # ExitStack closes every opened file once the request is done, however many there are.
+    with ExitStack() as stack:
+        files = [("documents", stack.enter_context(open(p, "rb"))) for p in image_paths or []]
+        if call_path:
+            files.append(("call", stack.enter_context(open(call_path, "rb"))))
+        result = _post("/api/v1/review/interaction", data={"transcript": transcript or ""}, files=files or None)
+    return result["report"], result
 
 
 def train_step(message: str, chat_history: list, dialect: str, state: dict):
@@ -60,6 +74,10 @@ def train_step(message: str, chat_history: list, dialect: str, state: dict):
     return chat_history, feedback, state
 
 
+
+
+
+# ----------------- Gradio UI -----------------
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title="Contact-Center QA Copilot") as demo:
         gr.Markdown("# Contact-Center QA Copilot\nArabic-first QA and PDPL compliance for Rimal Telecom (fictional).")
@@ -85,6 +103,17 @@ def build_ui() -> gr.Blocks:
             reply_in = gr.Textbox(label="Agent reply", rtl=True)
             policy_out = gr.JSON(label="Policy check")
             gr.Button("Check").click(check_reply, [cust_in, reply_in], policy_out)
+
+        with gr.Tab("Full interaction"):
+            full_transcript_in = gr.Textbox(label="Chat transcript (optional)", lines=8, rtl=True)
+            full_call_in = gr.Audio(type="filepath", label="Call recording (optional)")
+            full_images_in = gr.File(file_count="multiple", file_types=["image"], label="Images (optional)")
+            full_report_out, full_details_out = gr.JSON(label="Report"), gr.JSON(label="All reviews")
+            gr.Button("Review everything").click(
+                review_interaction,
+                [full_transcript_in, full_call_in, full_images_in],
+                [full_report_out, full_details_out],
+            )
 
         with gr.Tab("Training simulator"):
             dialect_in = gr.Dropdown(list(DIALECT_HINTS), value="najdi", label="Customer dialect")

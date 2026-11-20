@@ -2,7 +2,7 @@ from pydantic_ai import Agent
 
 from cc_copilot.pii.saudi_patterns import mask_pii
 from cc_copilot.types.model_choice import ModelChoice
-from cc_copilot.types.results import ChatReviewOutput, ChatReviewResult, PIIFinding
+from cc_copilot.types.results import ChatReviewOutput, ChatReviewResult, PIIFinding, Speaker
 
 REVIEW_INSTRUCTIONS = """
 <context>
@@ -40,6 +40,16 @@ chat_review_agent = Agent(
 )
 
 
+def speaker_at(transcript: str, position: int) -> Speaker | None:
+    """Who wrote the line containing 'position' from the 'customer/agent' label"""
+    line_start = transcript.rfind("\n",0,position) +1 
+    line = transcript[line_start:].lstrip().lower()
+    if line.startswith("agent:"):
+        return "agent"
+    elif line.startswith("customer:"):
+        return "customer"
+    return None
+
 async def review_chat(model_choice: ModelChoice, transcript: str) -> ChatReviewResult:
     # Mask first: raw identifiers never reach the model provider.
     masked, matches = mask_pii(transcript)
@@ -51,5 +61,5 @@ async def review_chat(model_choice: ModelChoice, transcript: str) -> ChatReviewR
     return ChatReviewResult(
         **result.output.model_dump(),
         masked_transcript=masked,
-        pii_findings=[PIIFinding.from_match(m) for m in matches],
+        pii_findings=[PIIFinding.from_match(m, speaker=speaker_at(transcript, m.start)) for m in matches],
     )

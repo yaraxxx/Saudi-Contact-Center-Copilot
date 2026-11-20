@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from cc_copilot.pii.saudi_patterns import PIIMatch, PIIType
 
 Dialect = Literal["najdi", "hijazi", "gulf", "msa", "english", "arabizi", "mixed", "other"]
+Speaker = Literal["agent", "customer"]
 
 
 class PIIFinding(BaseModel):
@@ -14,10 +15,11 @@ class PIIFinding(BaseModel):
     start: int
     end: int
     turn: int | None = Field(default=None, description="Transcript turn index, for call reviews")
+    speaker: Speaker | None = Field(default=None, description="Who wrote or said the PII; None if the line has no label")
 
     @classmethod
-    def from_match(cls, match: PIIMatch, turn: int | None = None) -> "PIIFinding":
-        return cls(type=match.type, start=match.start, end=match.end, turn=turn)
+    def from_match(cls, match: PIIMatch, turn: int | None = None, speaker: Speaker | None = None) -> "PIIFinding":
+        return cls(type=match.type, start=match.start, end=match.end, turn=turn, speaker=speaker)
 
 
 class ReviewResult(BaseModel):
@@ -53,7 +55,7 @@ class ChatReviewResult(ChatReviewOutput):
 
 
 class TranscriptTurn(BaseModel):
-    speaker: Literal["agent", "customer"]
+    speaker: Speaker
     text: str
 
 
@@ -119,3 +121,13 @@ class InteractionReport(BaseModel):
     blocking_issues: list[str]
     warnings: list[str]
     qa_score: float | None = None
+
+
+class InteractionReview(BaseModel):
+    """ Every Individual review of one interaction, plus the fused report. """
+
+    report: InteractionReport
+    chat: ChatReviewResult | None = None
+    call: CallQAResult | None = None
+    documents: list[DocumentReviewResult] = Field(default_factory=list)
+    policy: PolicyCheckResult | None = None
