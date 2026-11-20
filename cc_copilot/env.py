@@ -34,8 +34,9 @@ def get_default_model_choice() -> ModelChoice:
     from pydantic_ai.providers.google import GoogleProvider
 
     provider = GoogleProvider(api_key=_get_required_env("GEMINI_API_KEY"))
-    model = GoogleModel(_get_required_env("DEFAULT_GOOGLE_MODEL"), provider=provider,
-        model_settings=GoogleModelSettings(google_thinking_config={"thinking_budget": 0}, timeout=60),)
+    settings = GoogleModelSettings(google_thinking_config={"thinking_budget": 0}, timeout=60)
+    model = GoogleModel(_get_required_env("DEFAULT_GOOGLE_MODEL"), 
+                        provider=provider)
     if fallback_name := os.getenv("FALLBACK_GOOGLE_MODEL"):
         # If the main model is busy or down, pydantic-ai retries the same request on this one.
         model = FallbackModel(model, GoogleModel(fallback_name, provider=provider))
