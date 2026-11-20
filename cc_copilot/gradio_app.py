@@ -15,12 +15,21 @@ from cc_copilot.types.results import ChatReviewResult
 
 # POST  - The messenger service is a separate process, so we can't call it directly. We have to go over HTTP.
 def _post(path: str, **kwargs) -> dict:
-    response = requests.post(
-        f"{API_BASE_URL}{path}", headers={"Authorization": f"Bearer {get_user_api_key()}"}, timeout=120, **kwargs
-    )
-    response.raise_for_status()
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}{path}", headers={"Authorization": f"Bearer {get_user_api_key()}"}, timeout=120, **kwargs
+        )
+    except requests.Timeout:
+        raise gr.Error("The backend took over 2 minutes to answer. Gemini may be overloaded; please try again shortly.")
+    except requests.ConnectionError:
+        raise gr.Error(f"Can't reach the backend at {API_BASE_URL}. Is the API running?")
+    if not response.ok:
+        try:
+            detail = response.json().get("detail", response.text)
+        except ValueError:
+            detail = response.text
+        raise gr.Error(f"{response.status_code}: {detail}")
     return response.json()
-
 
 
 

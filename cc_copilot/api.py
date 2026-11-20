@@ -19,6 +19,10 @@ from cc_copilot.types.model_choice import ModelChoice
 from cc_copilot.types.results import CallQAResult, ChatReviewResult, DocumentReviewResult, PIIFinding, PolicyCheckResult, InteractionReview
 from cc_copilot.utils import detect_file_type
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from pydantic_ai.exceptions import FallbackExceptionGroup, ModelHTTPError
+
 # Standard auth scheme using -H "Authorization: Bearer <api_key>" header.
 security = HTTPBearer()
 
@@ -72,6 +76,16 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Contact-Center QA Copilot", dependencies=[Depends(validate_api_key)], lifespan=lifespan)
+
+
+
+@app.exception_handler(ModelHTTPError)
+@app.exception_handler(FallbackExceptionGroup)
+async def gemini_unavailable(_: Request, exc: Exception):
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Gemini is busy or unavailable. Please try again in a minute."},
+    )
 
 
 async def _read_upload(file: UploadFile, expected_prefix: str) -> tuple[bytes, str]:

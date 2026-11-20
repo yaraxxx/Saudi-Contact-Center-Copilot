@@ -26,18 +26,24 @@ def get_user_api_key() -> str:
     return _get_required_env("USER_API_KEY")
 
 
+
 @lru_cache
 def get_default_model_choice() -> ModelChoice:
+    from pydantic_ai.models.fallback import FallbackModel
     from pydantic_ai.models.google import GoogleModel, GoogleModelSettings
     from pydantic_ai.providers.google import GoogleProvider
 
+    provider = GoogleProvider(api_key=_get_required_env("GEMINI_API_KEY"))
+    model = GoogleModel(_get_required_env("DEFAULT_GOOGLE_MODEL"), provider=provider,
+        model_settings=GoogleModelSettings(google_thinking_config={"thinking_budget": 0}, timeout=60),)
+    if fallback_name := os.getenv("FALLBACK_GOOGLE_MODEL"):
+        # If the main model is busy or down, pydantic-ai retries the same request on this one.
+        model = FallbackModel(model, GoogleModel(fallback_name, provider=provider))
     return ModelChoice(
-        model=GoogleModel(
-            _get_required_env("DEFAULT_GOOGLE_MODEL"),
-            provider=GoogleProvider(api_key=_get_required_env("GEMINI_API_KEY")),
-        ),
-        model_settings=GoogleModelSettings(google_thinking_config={"thinking_budget": 0}),
+        model=model,
+        model_settings=GoogleModelSettings(timeout=60),  # give up on a single Gemini call after 60 s
     )
+
 
 
 def get_judge_model_choice() -> ModelChoice:
