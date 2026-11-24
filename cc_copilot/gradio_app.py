@@ -4,9 +4,11 @@ except the training simulator, which runs the customer agent in-process.
 """
 
 import asyncio
+from contextlib import ExitStack
+
 import gradio as gr
 import requests
-from contextlib import ExitStack
+
 from cc_copilot.agents.customer_sim_agent import DIALECT_HINTS, CustomerPersona, customer_reply
 from cc_copilot.env import API_BASE_URL, get_default_model_choice, get_user_api_key
 from cc_copilot.fusion import build_report
@@ -32,8 +34,8 @@ def _post(path: str, **kwargs) -> dict:
     return response.json()
 
 
-
 # ----------------- Handler functions for Gradio UI -----------------
+
 
 def mask_text(text: str) -> tuple[str, list]:
     result = _post("/api/v1/pii/mask", json={"text": text})
@@ -81,9 +83,6 @@ def train_step(message: str, chat_history: list, dialect: str, state: dict):
     chat_history = chat_history + [{"role": "user", "content": message}, {"role": "assistant", "content": reply}]
     feedback = "; ".join(report.warnings) or "Looks good."
     return chat_history, feedback, state
-
-
-
 
 
 # ----------------- Gradio UI -----------------

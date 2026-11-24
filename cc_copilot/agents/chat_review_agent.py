@@ -42,13 +42,14 @@ chat_review_agent = Agent(
 
 def speaker_at(transcript: str, position: int) -> Speaker | None:
     """Who wrote the line containing 'position' from the 'customer/agent' label"""
-    line_start = transcript.rfind("\n",0,position) +1 
+    line_start = transcript.rfind("\n", 0, position) + 1
     line = transcript[line_start:].lstrip().lower()
     if line.startswith("agent:"):
         return "agent"
     elif line.startswith("customer:"):
         return "customer"
     return None
+
 
 async def review_chat(model_choice: ModelChoice, transcript: str) -> ChatReviewResult:
     # Mask first: raw identifiers never reach the model provider.

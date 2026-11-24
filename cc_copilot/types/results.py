@@ -15,7 +15,9 @@ class PIIFinding(BaseModel):
     start: int
     end: int
     turn: int | None = Field(default=None, description="Transcript turn index, for call reviews")
-    speaker: Speaker | None = Field(default=None, description="Who wrote or said the PII; None if the line has no label")
+    speaker: Speaker | None = Field(
+        default=None, description="Who wrote or said the PII; None if the line has no label"
+    )
 
     @classmethod
     def from_match(cls, match: PIIMatch, turn: int | None = None, speaker: Speaker | None = None) -> "PIIFinding":
@@ -124,7 +126,7 @@ class InteractionReport(BaseModel):
 
 
 class InteractionReview(BaseModel):
-    """ Every Individual review of one interaction, plus the fused report. """
+    """Every Individual review of one interaction, plus the fused report."""
 
     report: InteractionReport
     chat: ChatReviewResult | None = None

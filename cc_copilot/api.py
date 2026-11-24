@@ -1,27 +1,32 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from functools import lru_cache
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, Form
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-import asyncio
+from pydantic_ai.exceptions import FallbackExceptionGroup, ModelHTTPError
 
 from cc_copilot.agents.call_qa_agent import review_call
 from cc_copilot.agents.chat_review_agent import review_chat
 from cc_copilot.agents.document_agent import review_document
 from cc_copilot.agents.policy_agent import check_policy, last_exchange
-from cc_copilot.fusion import build_report
 from cc_copilot.env import POLICY_DIR, get_default_model_choice, get_user_api_key
+from cc_copilot.fusion import build_report
 from cc_copilot.pii.saudi_patterns import mask_pii
 from cc_copilot.rag.retriever import BM25Retriever, load_policy_chunks
 from cc_copilot.types.model_choice import ModelChoice
-from cc_copilot.types.results import CallQAResult, ChatReviewResult, DocumentReviewResult, PIIFinding, PolicyCheckResult, InteractionReview
+from cc_copilot.types.results import (
+    CallQAResult,
+    ChatReviewResult,
+    DocumentReviewResult,
+    InteractionReview,
+    PIIFinding,
+    PolicyCheckResult,
+)
 from cc_copilot.utils import detect_file_type
-
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from pydantic_ai.exceptions import FallbackExceptionGroup, ModelHTTPError
 
 # Standard auth scheme using -H "Authorization: Bearer <api_key>" header.
 security = HTTPBearer()
@@ -78,7 +83,6 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Contact-Center QA Copilot", dependencies=[Depends(validate_api_key)], lifespan=lifespan)
 
 
-
 @app.exception_handler(ModelHTTPError)
 @app.exception_handler(FallbackExceptionGroup)
 async def gemini_unavailable(_: Request, exc: Exception):
@@ -130,6 +134,7 @@ async def policy_check_endpoint(
 ):
     return await check_policy(model_choice, retriever, request.customer_message, request.agent_reply)
 
+
 @app.post("/api/v1/review/interaction", response_model=InteractionReview)
 async def review_interaction_endpoint(
     transcript: str | None = Form(None),
@@ -160,7 +165,9 @@ async def review_interaction_endpoint(
     results = dict(zip(tasks, await asyncio.gather(*tasks.values())))
     docs = [results[f"document_{i}"] for i in range(len(doc_uploads))]
 
-    report = build_report(chat=results.get("chat"), call=results.get("call"), documents=docs, policy=results.get("policy"))
+    report = build_report(
+        chat=results.get("chat"), call=results.get("call"), documents=docs, policy=results.get("policy")
+    )
     return InteractionReview(
         report=report, chat=results.get("chat"), policy=results.get("policy"), call=results.get("call"), documents=docs
     )

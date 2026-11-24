@@ -27,6 +27,7 @@ policy_agent = Agent(
     instructions=POLICY_INSTRUCTIONS,
 )
 
+
 def last_exchange(transcript: str) -> tuple[str, str] | None:
     """The last "Customer:" and "Agent:" lines of a transcript, or None if either is missing."""
     last = {"customer": None, "agent": None}
@@ -37,7 +38,6 @@ def last_exchange(transcript: str) -> tuple[str, str] | None:
     if last["customer"] is None or last["agent"] is None:
         return None
     return last["customer"], last["agent"]
-
 
 
 def build_prompt(customer_message: str, agent_reply: str, retriever: BM25Retriever, top_k: int) -> tuple[str, set[str]]:
